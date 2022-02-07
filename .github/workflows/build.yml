@@ -1,0 +1,52 @@
+name: Test/Upload
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: ${{ matrix.py }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        py: ['3.7', '3.8', '3.9', '3.10', '3.x']
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.py }}
+
+      - name: Prep
+        shell: bash
+        run: |
+          set -x
+          python -m pip install -U pip
+          python --version
+          python -m pip --version
+          python -m pip install pytest twine
+
+      - name: sdist
+        shell: bash
+        run: |
+          python setup.py sdist -v --formats=gztar
+          ls -lh dist
+
+      - name: wheel
+        shell: bash
+        run: |
+          python -m pip wheel -v -w dist dist/just_tcp_proxy-*.tar.gz
+          ls -lh dist
+
+      - name: Test
+        shell: bash
+        run: |
+          set -x
+          python -m pip install -v --no-index -f dist just_tcp_proxy
+          cd dist
+          python -m pytest --pyargs -v --log-level=DEBUG just_tcp_proxy
+
+      - name: Check
+        run: python -m twine check dist/just_tcp_proxy*
